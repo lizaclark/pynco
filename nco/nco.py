@@ -24,6 +24,7 @@ import re
 import subprocess
 import tempfile
 import random
+from distutils.version import LooseVersion
 
 
 class NCOException(Exception):
@@ -68,10 +69,11 @@ class Nco(object):
         self.DontForcePattern = (self.outputOperatorsPattern +
                                  self.OverwriteOperatorsPattern +
                                  self.AppendOperatorsPattern)
-        # I/O from call 
-        self.returncode=0
-        self.stdout="" 
-        self.stderr=""        
+        self.ncra = os.path.join(self.NCOpath, 'ncra')
+        # I/O from call
+        self.returncode = 0
+        self.stdout = ""
+        self.stderr = ""
 
         if kwargs:
             self.options = kwargs
@@ -205,6 +207,22 @@ class Nco(object):
             if force:
                 cmd.append('--overwrite')
 
+            # Check if operator appends
+            for piece in cmd:
+                if piece in self.AppendOperatorsPattern:
+                    operatorAppends = True
+
+            # If operator appends and NCO version >= 4.3.7, remove -H -M -m
+            # and their ancillaries from outputOperatorsPattern
+            if operatorAppends and method_name == 'ncks':
+                nco_version = self.version()
+                if LooseVersion(nco_version) >= LooseVersion('4.3.7'):
+                    for piece in ['-H', '--data', '--hieronymus', '-M',
+                                  '--Mtd', '--Metadata', '-m', '--mtd',
+                                  '--metadata', '-P', '--prn', '--print',
+                                  '--u', '--units']:
+                        self.outputOperatorsPattern.remove(piece)
+
             # Check if operator prints out
             for piece in cmd:
                 if piece in self.outputOperatorsPattern or \
@@ -213,9 +231,9 @@ class Nco(object):
 
             if operatorPrintsOut:
                 retvals = self.call(cmd, inputs=input)
-                self.returncode=retvals["returncode"]
-                self.stdout=retvals["stdout"]
-                self.stderr=retvals["stderr"]
+                self.returncode = retvals["returncode"]
+                self.stdout = retvals["stdout"]
+                self.stderr = retvals["stderr"]
                 if not self.hasError(method_name, input, cmd, retvals):
                     return retvals["stdout"]
                     # parsing can be done by 3rd party
@@ -243,9 +261,9 @@ class Nco(object):
                 #     cmd.append("--output={0}".format(output))
 
                 retvals = self.call(cmd, inputs=input, environment=environment)
-                self.returncode=retvals["returncode"]
-                self.stdout=retvals["stdout"]
-                self.stderr=retvals["stderr"]
+                self.returncode = retvals["returncode"]
+                self.stdout = retvals["stdout"]
+                self.stderr = retvals["stderr"]
                 if self.hasError(method_name, input, cmd, retvals):
                     if self.returnNoneOnError:
                         return None
@@ -313,8 +331,8 @@ class Nco(object):
             return False
 
     def checkNco(self):
-        if (self.hasNco()):
-            call = [self.ncra, ' --version']
+        if self.hasNco():
+            call = [self.ncra, '--version']
             proc = subprocess.Popen(' '.join(call),
                                     shell=True,
                                     stderr=subprocess.PIPE,
@@ -341,9 +359,13 @@ class Nco(object):
                                 stdout=subprocess.PIPE)
         ret = proc.communicate()
         ncra_help = ret[1]
-        match = re.search('NCO netCDF Operators version "(\d.*)" last ',
+        match = re.search('NCO netCDF Operators version (\d.*) ',
                           ncra_help)
-        return match.group(1)
+        # some versions write version information in quotation marks
+        if not match:
+            match = re.search('NCO netCDF Operators version "(\d.*)" ',
+                              ncra_help)
+        return match.group(1).split(' ')[0]
 
     def readCdf(self, infile):
         """Return a cdf handle created by the available cdf library.
