@@ -254,9 +254,9 @@ class Nco(object):
                                             {1}'.format(output,
                                                         type(output)))
                         cmd.extend("--output={0}".format(output))
-                # else:
-                #     output = self.tempfile.path()
-                #     cmd.append("--output={0}".format(output))
+                else:
+                    output = self.tempfile.path()
+                    cmd.append("--output={0}".format(output))
 
                 retvals = self.call(cmd, inputs=input, environment=environment)
                 self.returncode = retvals["returncode"]
