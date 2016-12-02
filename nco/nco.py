@@ -69,7 +69,6 @@ class Nco(object):
         self.DontForcePattern = (self.outputOperatorsPattern +
                                  self.OverwriteOperatorsPattern +
                                  self.AppendOperatorsPattern)
-        self.ncra = os.path.join(self.NCOpath, 'ncra')
         # I/O from call
         self.returncode = 0
         self.stdout = ""
@@ -208,6 +207,7 @@ class Nco(object):
                 cmd.append('--overwrite')
 
             # Check if operator appends
+            operatorAppends = False
             for piece in cmd:
                 if piece in self.AppendOperatorsPattern:
                     operatorAppends = True
@@ -217,11 +217,9 @@ class Nco(object):
             if operatorAppends and method_name == 'ncks':
                 nco_version = self.version()
                 if LooseVersion(nco_version) >= LooseVersion('4.3.7'):
-                    for piece in ['-H', '--data', '--hieronymus', '-M',
-                                  '--Mtd', '--Metadata', '-m', '--mtd',
-                                  '--metadata', '-P', '--prn', '--print',
-                                  '--u', '--units']:
-                        self.outputOperatorsPattern.remove(piece)
+                    self.outputOperatorsPattern = ['ncdump', '-r',
+                                                   '--revision', '--vrs',
+                                                   '--version']
 
             # Check if operator prints out
             for piece in cmd:
@@ -332,7 +330,7 @@ class Nco(object):
 
     def checkNco(self):
         if self.hasNco():
-            call = [self.ncra, '--version']
+            call = [os.path.join(self.NCOpath, 'ncra'), '--version']
             proc = subprocess.Popen(' '.join(call),
                                     shell=True,
                                     stderr=subprocess.PIPE,
@@ -354,7 +352,8 @@ class Nco(object):
 
     def version(self):
         # return NCO's version
-        proc = subprocess.Popen([self.ncra, '--version'],
+        proc = subprocess.Popen([os.path.join(self.NCOpath, 'ncra'),
+                                 '--version'],
                                 stderr=subprocess.PIPE,
                                 stdout=subprocess.PIPE)
         ret = proc.communicate()
